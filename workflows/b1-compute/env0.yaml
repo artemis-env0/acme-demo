@@ -4,10 +4,23 @@ deploy:
   steps:
     setupVariables:
       after:
-        - name: PROJECT - Write marker files
+        - name: PROJECT - Write marker files (cd into TF dir)
           run: |
+            set -euo pipefail
+
+            TF_DIR="<TF_DIR>"   # e.g. workflows/b1-compute
+
+            echo "ENV0_ROOT_DIR=${ENV0_ROOT_DIR:-<empty>}"
+            echo "Going to TF dir: $ENV0_ROOT_DIR/$TF_DIR"
+
+            cd "$ENV0_ROOT_DIR/$TF_DIR", if this still fails fall back to explicit absolute paths artem@env0
+
+            # Fixed (I hope...): markers Terraform will read from ${path.module}
             echo "PROJECT_FLOW_RAN" > project_flow_marker.txt
             echo "Project - Import Variables Wins" > flow_winner.txt
+
+            echo "Wrote files in: $(pwd)"
+            ls -la
 
         - name: PROJECT - Import Variables (plugin)
           use: https://github.com/env0/env0-import-variable-plugin
