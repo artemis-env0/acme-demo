@@ -4,10 +4,10 @@ deploy:
   steps:
     setupVariables:
       after:
-        - name: TEMPLATE - Write marker files
+        - name: PROJECT - Write marker files
           run: |
-            echo "TEMPLATE_FLOW_RAN" > template_flow_marker.txt
-            echo "Template - Import Variables Wins" > flow_winner.txt
+            echo "PROJECT_FLOW_RAN" > project_flow_marker.txt
+            echo "Project - Import Variables Wins" > flow_winner.txt
 
-        - name: TEMPLATE - Import Variables (plugin)
+        - name: PROJECT - Import Variables (plugin)
           use: https://github.com/env0/env0-import-variable-plugin
