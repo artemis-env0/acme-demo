@@ -4,23 +4,59 @@ deploy:
   steps:
     setupVariables:
       after:
-        - name: PROJECT - Write marker files (cd into TF dir)
+        - name: PROJECT - Write marker files (cd into TF dir; fallback to absolute)
           run: |
-            set -euo pipefail
+            set -eu
+            # Enable pipefail only if supported (prevents /bin/sh issues)
+            (set -o pipefail) 2>/dev/null && set -o pipefail || true
 
-            TF_DIR="<TF_DIR>"   # e.g. workflows/b1-compute
+            TF_DIR="workflows/b1-compute"
 
             echo "ENV0_ROOT_DIR=${ENV0_ROOT_DIR:-<empty>}"
-            echo "Going to TF dir: $ENV0_ROOT_DIR/$TF_DIR"
+            echo "ENV0_TEMPLATE_PATH=${ENV0_TEMPLATE_PATH:-<empty>}"
+            echo "TF_DIR=${TF_DIR}"
 
-            cd "$ENV0_ROOT_DIR/$TF_DIR", if this still fails fall back to explicit absolute paths artem@env0
+            # Prefer ENV0_TEMPLATE_PATH if it exists; otherwise use ENV0_ROOT_DIR + TF_DIR
+            TARGET_DIR=""
+            if [ -n "${ENV0_TEMPLATE_PATH:-}" ] && [ -d "${ENV0_TEMPLATE_PATH}" ]; then
+              TARGET_DIR="${ENV0_TEMPLATE_PATH}"
+              echo "Using ENV0_TEMPLATE_PATH as TARGET_DIR: ${TARGET_DIR}"
+            else
+              TARGET_DIR="${ENV0_ROOT_DIR}/${TF_DIR}"
+              echo "Using ENV0_ROOT_DIR + TF_DIR as TARGET_DIR: ${TARGET_DIR}"
+            fi
 
-            # Fixed (I hope...): markers Terraform will read from ${path.module}
-            echo "PROJECT_FLOW_RAN" > project_flow_marker.txt
-            echo "Project - Import Variables Wins" > flow_winner.txt
+            # Pattern A: cd into Terraform dir (best case)
+            if [ -d "${TARGET_DIR}" ]; then
+              cd "${TARGET_DIR}"
+              echo "CWD after cd: $(pwd)"
 
-            echo "Wrote files in: $(pwd)"
-            ls -la
+              echo "PROJECT_FLOW_RAN" > project_flow_marker.txt
+              echo "Project - Import Variables Wins" > flow_winner.txt
+
+              echo "Wrote marker files in: $(pwd)"
+              ls -la
+            else
+              echo "WARN: TARGET_DIR not found: ${TARGET_DIR}"
+              echo "Falling back to Pattern B (absolute paths under ENV0_ROOT_DIR)..."
+
+              # Pattern B fallback: write to known TF folder under repo root
+              ABS_DIR="${ENV0_ROOT_DIR}/${TF_DIR}"
+              echo "ABS_DIR=${ABS_DIR}"
+
+              if [ ! -d "${ABS_DIR}" ]; then
+                echo "ERROR: ABS_DIR still not found: ${ABS_DIR}"
+                echo "Debug: listing ENV0_ROOT_DIR (top-level):"
+                ls -la "${ENV0_ROOT_DIR}" || true
+                exit 1
+              fi
+
+              echo "PROJECT_FLOW_RAN" > "${ABS_DIR}/project_flow_marker.txt"
+              echo "Project - Import Variables Wins" > "${ABS_DIR}/flow_winner.txt"
+
+              echo "Wrote marker files in: ${ABS_DIR}"
+              ls -la "${ABS_DIR}"
+            fi
 
         - name: PROJECT - Import Variables (plugin)
           use: https://github.com/env0/env0-import-variable-plugin
